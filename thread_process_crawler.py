@@ -7,7 +7,7 @@ import datetime
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import ProcessPoolExecutor
 from lxml import etree
-# import gevent
+import gevent
 
 url = "https://segmentfault.com/blogs";
 user_agent = "Mozilla/4.0 (compatible; MSIE 5.5; Windows NT)";
@@ -31,37 +31,38 @@ def downloadURL(url,callback =None):
             callback(resp.read().decode("utf-8"))
     else:
         print("unexcept error:"+str(i))
+    time.sleep(1)
 
 
 #scrpit run
 i = 1
 start_time = datetime.datetime.now()
-#test single thread
+#test single thread 2min18s
 # while(i < 100):
 #     downloadURL(url+"?page="+str(i))
 #     i+=1
 #     time.sleep(1)
 
-#test mutil thread
-pool = ThreadPoolExecutor(5)
-while(i<100):
-    pool.submit(downloadURL,url+"?page="+str(i))
-    i+=1
-    time.sleep(1)
-pool.shutdown()
-
-#test mutil process
-# pool = ProcessPoolExecutor(2)
+#test mutil thread 1min39s
+# pool = ThreadPoolExecutor(5)
 # while(i<100):
-#     pool.submit(downloadURL(url+"?page="+str(i)))
+#     pool.submit(downloadURL,url+"?page="+str(i))
 #     i+=1
 #     time.sleep(1)
+# pool.shutdown()
+
+# test mutil process 1min39s
+# pool = ProcessPoolExecutor(2)
+# while(i<100):
+#     pool.submit(downloadURL,url+"?page="+str(i))
+#     i+=1
+#     time.sleep(1)
+# pool.shutdown()
 
 #test gevent
 # threads = []
 # for i in range(1,100):
 #     threads.append(gevent.spawn(downloadURL,url+"?page="+str(i)))
-# print("start")
 # gevent.joinall(threads)
 
 cost = (datetime.datetime.now() - start_time);

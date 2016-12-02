@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-
+#test data:
+# 1.single thread fetchs 554 pages costing 20min14s
+# 2.multi thread(4) fetchs 554 pages costing 4min10s
+# 3.multi process(2: my computer is 2 cores) fetchs 554 pages costing over 4min. I can't test because of sync set failed.
 import urllib.request
-from lxml import etree
+import multiprocessing
 import queue
-from concurrent.futures import ThreadPoolExecutor
 import random
 import time
 import datetime
 import re
+from threading import Thread
 from threading import Lock
 from bs4 import BeautifulSoup
 
@@ -23,6 +26,27 @@ USER_AGENTS = [
 rootURL = "https://segmentfault.com"
 
 setLock = Lock()
+process_lock = multiprocessing.Lock()
+
+class Worker(Thread):
+    def __init__(self,queue,s):
+        Thread.__init__(self)
+        self.q = queue
+        self.s = s
+
+    def run(self):
+        while True:
+            url = self.q.get()
+            if url in self.s:
+                self.q.task_done()
+                continue
+            else:
+                setLock.acquire()
+                self.s.add(url)
+                setLock.release()
+            crawlURL(url,self.q,extractData)
+            time.sleep(1)
+            self.q.task_done()
 
 def extractData(html=None):
     pass
@@ -69,49 +93,57 @@ def crawlURL(url=None,queue=None,callback=None):
         if callback is not None:
             callback(html)
 
-def execCrawl(q=None,fetchedSet=None):
-    try:
-        url = q.get(timeout=60)
-        if url in fetchedURLSet:
-            return
+def process_crawl(queue,s):
+    while True:
+        url = queue.get()
+        if url in s:
+            queue.task_done()
+            continue
         else:
-            setLock.acquire()
-            fetchedSet.add(url)
-            setLock.release()
-        crawlURL(url,q,extractData)
-    except queue.Empty:
-        pass
+            process_lock.acquire()
+            s.add(url)
+            process_lock.release()
+        crawlURL(url,queue,extractData)
+        time.sleep(1)
+        queue.task_done()
 
-def main():
+def thread_main():
     print("started!")
     start_time = datetime.datetime.now()
     start_url = "https://segmentfault.com/blogs"
-    executorPool= ThreadPoolExecutor(5)
-    fetchedURLSet = set()
-    q = queue.Queue(1000)
+    s = set()
+    q = queue.Queue()
     q.put(start_url)
-    while True:
-        # try:
-        #     url = q.get(timeout=60)
-        #     if url in fetchedURLSet:
-        #         continue
-        #     else:
-        #         fetchedURLSet.add(url)
-        #     crawlURL(url,q,extractData)
-        #     time.sleep(1)
-        # except queue.Empty:
-        #     break
-            # if count == 1000:
-                # print("No longer has url exit!")
-                # break
-            # count+=1
-            # time.sleep(0.2)
-        executorPool.submit(execCrawl,q,fetchedURLSet)
-        time.sleep(1)
-    executorPool.shutdown()
+
+    for x in range(4):
+        worker = Worker(q,s)
+        worker.setDaemon(True)
+        worker.start()
+
+    q.join()
+    cost = (datetime.datetime.now() - start_time);
+    print("cost:"+str(cost))
+    print("finished!")
+
+def process_main():
+    print("started!")
+    start_time = datetime.datetime.now()
+    start_url = "https://segmentfault.com/blogs"
+    # pool = multiprocessing.Pool(2)
+    s = set()
+    q = multiprocessing.JoinableQueue(1000)
+    q.put(start_url)
+
+    for x in range(2):
+        p = multiprocessing.Process(target=process_crawl,args=(q,s))
+        p.start()
+
+    # pool.close()
+    # pool.join()
+    q.join()
     cost = (datetime.datetime.now() - start_time);
     print("cost:"+str(cost))
     print("finished!")
 
 if __name__ == "__main__":
-    main()
+    process_main()

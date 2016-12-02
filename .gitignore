@@ -1,0 +1,4 @@
+install_tc.sh
+aiohttp_spider/
+__pycache__/
+test_cases.py
