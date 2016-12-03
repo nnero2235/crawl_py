@@ -2,14 +2,20 @@
 # -*- coding: utf-8 -*-
 
 import urllib.request
-import threadPool
 import datetime
 import time
 import logging
 import random
 import queue
-import tSet
 from bs4 import BeautifulSoup
+
+try:
+    import tSet
+    import threadPool
+except:
+    from . import tSet
+    from . import threadPool
+
 
 #same to logging LEVEL  value
 LOG_DEBUG = 10
@@ -38,25 +44,24 @@ class Crawler(object):
 
     def __fetchURL(self,url):
         logging.debug("Fetching:"+url)
-        headers = {"userAgent":USER_AGENTS[random.randint(0,4)]}
+        host = url[url.index("/")+2:url.index("/",8)]
+        logging.debug("host:"+host)
+        headers = {"User-Agent":USER_AGENTS[random.randint(0,4)],
+                    "Host":host,
+                    "Refer":host}
         req = urllib.request.Request(url,headers=headers)
-        resq = urllib.request.urlopen(req)
-        code = resq.code
-        if code == 200:
-            try:
+
+        try:
+            resq = urllib.request.urlopen(req,timeout=30)
+            code = resq.code
+            if code == 200:
                 result = resq.read().decode("utf-8")
                 logging.info("200:"+url)
                 return result
-            except: #may decode error
-                return None
-        elif code == 404:
-            logging.error("404:"+url)
-        elif code == 500 or code == 502 or code == 503:
-            logging.error("Server Error:"+url)
-        elif code == 403:
-            logging.error("403 ip ban:"+url)
-        else:
-            logging.error("unexcepted Error code:"+code+" url:"+url)
+            else:
+                logging.error("unexcepted Error code:"+code+" url:"+url)
+        except:
+            logging.error("timeout:"+url)
         return None
 
     def __getLinks(self,soup=None):
@@ -73,13 +78,13 @@ class Crawler(object):
         else:
             return None
 
-    def crawlURL(self,url,queue):
+    def crawlURL(self,url):
         html = self.__fetchURL(url)
         if html is not None:
             soup = BeautifulSoup(html,"lxml")
             links = self.__getLinks(soup)
             for link in links:
-                queue.put(link)
+                self.queue.put(link)
             self.processData(soup)
         else:
             logging.info("html none:"+url)
@@ -101,7 +106,7 @@ class Crawler(object):
                     continue
                 else:
                     self.t_set.add(url)
-                self.__pool.execute(self.crawlURL,(url,self.queue))
+                self.__pool.execute(self.crawlURL,(url,))
             except queue.Empty:
                 logging.critical("no url in queue exit!")
                 break
