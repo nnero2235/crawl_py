@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+"""
+the tcrawler use queue module and origin datastruct set to manager task queue and url set.
+so it has much limits.eg: set will be biger and biger until costing all of memory.
+"""
+
 import urllib.request
 import datetime
 import time
@@ -12,28 +17,14 @@ from bs4 import BeautifulSoup
 try:
     import tSet
     import threadPool
+    import Cons
 except:
     from . import tSet
     from . import threadPool
-
-
-#same to logging LEVEL  value
-LOG_DEBUG = 10
-LOG_INFO = 20
-LOG_WARNING = 30
-LOG_ERROR = 40
-LOG_CRITIAL = 50
-
-USER_AGENTS = [
-"Mozilla/4.0 (compatible; MSIE 5.5; Windows NT)",
-"Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.95 Safari/537.36 OPR/26.0.1656.60",
-"Opera/8.0 (Windows NT 5.1; U; en)",
-"Mozilla/5.0 (Windows NT 5.1; U; en; rv:1.8.1) Gecko/20061208 Firefox/2.0.0 Opera 9.50",
-"Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1; en) Opera 9.50"
-]
+    from . import Cons
 
 class Crawler(object):
-    def __init__(self,startURL=None,baseURL=None,maxThreads=1,logLevel=10):
+    def __init__(self,startURL=None,baseURL=None,maxThreads=1,logLevel=Cons.LOG_DEBUG):
         self.__pool = threadPool.TinyThreadPool(maxThreads)
         self.startURL = startURL
         self.baseURL = baseURL
@@ -46,9 +37,9 @@ class Crawler(object):
         logging.debug("Fetching:"+url)
         host = url[url.index("/")+2:url.index("/",8)]
         logging.debug("host:"+host)
-        headers = {"User-Agent":USER_AGENTS[random.randint(0,4)],
-                    "Host":host,
-                    "Refer":host}
+        headers = {Cons.HTTP_HEADERS["ua"]:Cons.USER_AGENTS[random.randint(0,4)],
+                    Cons.HTTP_HEADERS["host"]:host,
+                    Cons.HTTP_HEADERS["refer"]:host}
         req = urllib.request.Request(url,headers=headers)
 
         try:
