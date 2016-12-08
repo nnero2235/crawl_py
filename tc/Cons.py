@@ -24,5 +24,10 @@ HTTP_HEADERS = {
 REDIS_TASK_KEYS = "task_keys"
 REDIS_URL_KEYS = "url_keys"
 
+REDIS_TASK_COMLETE = "is_complete"
+REDIS_TASK_QUEUE_SIZE = "task_queue_size"
+REDIS_TASK_FETCHED_URLS = "fetched_urls"
+REDIS_TASK_RE_FETCH = "re_fetch"
+
 #task queue default time
 TASK_QUEUE_WAIT_TIME = 10

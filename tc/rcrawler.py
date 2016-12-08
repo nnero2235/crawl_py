@@ -31,7 +31,7 @@ class NoURLError(Exception):
         self.__repr__(self.value)
 
 class Crawler(object):
-    def __init__(self,startURL=None,baseURL=None,maxThreads=1,logLevel=10,projectName=None):
+    def __init__(self,startURL=None,baseURL=None,maxThreads=1,logLevel=10,projectName=None,reFetch=1):
         self.__pool = threadPool.TinyThreadPool(maxThreads)
         self.startURL = startURL
         self.baseURL = baseURL
@@ -40,6 +40,7 @@ class Crawler(object):
         self.condition = Condition(self.lock)
         self.noURLError = NoURLError()
         self.projectName = projectName
+        self.reFetch = reFetch
         if self.projectName is None:
             raise RuntimeError("projectName must be a unique value to create redis taskQueue and urlSet")
         self.taskKey = self.projectName+":task_queue"
@@ -111,9 +112,33 @@ class Crawler(object):
             if not self.redisPool.sismember(Cons.REDIS_URL_KEYS,self.urlKey):
                 self.redisPool.sadd(Cons.REDIS_URL_KEYS,self.urlKey)
 
-            self.redisPool.delete(self.taskKey)
-            self.redisPool.delete(self.urlKey)
-            self.redisPool.lpush(self.taskKey,self.startURL)
+            if not self.redisPool.exists(self.projectName):
+                self.redisPool.hmset(self.projectName,{
+                Cons.REDIS_TASK_COMLETE : 0,
+                Cons.REDIS_TASK_RE_FETCH : self.reFetch
+                })
+                self.redisPool.delete(self.taskKey)
+                self.redisPool.delete(self.urlKey)
+                self.redisPool.lpush(self.taskKey,self.startURL)
+                logging.info("new task!")
+            else:
+                is_complete = self.redisPool.hget(self.projectName,Cons.REDIS_TASK_COMLETE).decode("utf-8")
+                re_fetch = self.redisPool.hget(self.projectName,Cons.REDIS_TASK_RE_FETCH).decode("utf-8")
+                if is_complete == "1" and re_fetch == "1":
+                    logging.info("task complete with fetching "+str(self.redisPool.scard(self.urlKey))+" urls.")
+                    logging.info("now restart task. clear old data.")
+                    self.redisPool.hset(self.projectName,Cons.REDIS_TASK_COMLETE,0)
+                    self.redisPool.delete(self.taskKey)
+                    self.redisPool.delete(self.urlKey)
+                    self.redisPool.lpush(self.taskKey,self.startURL)
+                elif is_complete == "1" and re_fetch == "0":
+                    logging.info("task complete with fetching "+str(self.redisPool.scard(self.urlKey))+" urls.")
+                    logging.info("No need restart!")
+                    exit(0)
+                elif is_complete == "0":
+                    logging.info("task not complete and fetching "+str(self.redisPool.scard(self.urlKey))+" urls.")
+                    logging.info("task continue: task queue size:"+str(self.redisPool.llen(self.taskKey))+".")
+
         except redis.ConnectionError:
             logging.error("redis connect failure please start redis server or check the auth!")
             exit(0)
@@ -147,6 +172,7 @@ class Crawler(object):
                 break
         self.__pool.join()
         # self.redisPool.shutdown()
+        self.redisPool.hset(self.projectName,Cons.REDIS_TASK_COMLETE , 1)
         cost = datetime.datetime.now() - startTime
         logging.critical("finished!")
         logging.critical("cost:"+str(cost))
